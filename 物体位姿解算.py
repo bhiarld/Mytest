@@ -4,19 +4,28 @@ import numpy as np
 rows = 4
 cols = 2
 zb = [[0 for _ in range(cols)] for _ in range(rows)]
+output_video = "output_video.mp4"
 cv2.namedWindow('mp4_out',cv2.WINDOW_NORMAL)
 cv2.resizeWindow('mp4_out',1200,800)
 video = cv2.VideoCapture("lanliu2.mp4")
 if not video.isOpened():
     print("无法打开视频文件")
     exit()
+# 获取视频信息
+fps = video.get(cv2.CAP_PROP_FPS)
+width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
+height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
+# 创建视频写入对象
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4编码
+out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
+frame_count = 0
 while True:
     ret, frame = video.read()
     if not ret:
         print("视频播放完毕")
         break
-
+    frame_count += 1
     frame_1 = frame.copy()
     # 转化为灰度图及全局阈值二值化
     #retval, binary = cv2.threshold(gray, 75, 255, cv2.THRESH_BINARY)
@@ -108,6 +117,7 @@ while True:
         cv2.line(frame, tuple(projected_axis_points[0].ravel()), tuple(projected_axis_points[i].ravel()),
                  (0, 255, 0), 2)
     cv2.imshow("mp4_out", frame)
+    out.write(frame)
     # 按ESC退出
     if cv2.waitKey(60) == 27:
         break
@@ -115,3 +125,4 @@ while True:
 # 释放资源
 video.release()
 cv2.destroyAllWindows()
+out.release()
