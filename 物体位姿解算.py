@@ -7,7 +7,7 @@ zb = [[0 for _ in range(cols)] for _ in range(rows)]
 output_video = "output_video.mp4"
 cv2.namedWindow('mp4_out',cv2.WINDOW_NORMAL)
 cv2.resizeWindow('mp4_out',1200,800)
-video = cv2.VideoCapture("lanliu2.mp4")
+video = cv2.VideoCapture("lanliu11.mp4")
 if not video.isOpened():
     print("无法打开视频文件")
     exit()
@@ -32,7 +32,7 @@ while True:
     # 显示图像
     # cv2.imshow('original', image)
     # cv2.imshow('binary', binary)
-    blue_lower = np.array([90, 50, 50])  # 深蓝色
+    blue_lower = np.array([80, 50, 50])  # 深蓝色
     blue_upper = np.array([130, 255, 255])  # 浅蓝色
 
     # 转换为HSV颜色空间
@@ -59,8 +59,12 @@ while True:
         # 求多边形面积
         area = cv2.contourArea(contour)
         area2=w*h
-        if lens == 6 and 500< area < 3000 and area2<10000:
-            # 画出边界框
+        if lens == 6 and 10000 < area < 60000 and area2 < 100000:
+            M = cv2.moments(contour)
+            """if M["m00"] != 0:
+                cx = int(M["m10"] / M["m00"])
+                cy = int(M["m01"] / M["m00"])
+                画出边界框"""
             img_1 = cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
             zb[detected_count] = [x, y]
             detected_count += 1
@@ -70,12 +74,12 @@ while True:
     #cv2.waitKey(0)
     #print(zb)
     # cv2.imwrite("binary.png", img_1)
-    h = 0
+    """h = 0
     n = 0
     for h in range(3):
-        for n in range(0, 2):
+        for n in range(2):
             if np.sum(zb[n]) > np.sum(zb[n + 1]):
-                zb[n], zb[n + 1] = zb[n + 1], zb[n]
+                zb[n], zb[n + 1] = zb[n + 1], zb[n]"""
     '''(a,b)=zb[0]
     (c,d)=zb[1]
     (e,f)=zb[2]'''
@@ -86,10 +90,35 @@ while True:
         # 更新zb列表
         for i in range(detected_count):
             zb[i] = sorted_points[i]
-    objectPoints = np.array([[0, 0, 70],
-                             [125, 0, 70],
+    # 添加点位置一致性检查
+    if detected_count != 4:
+            continue
+    else:
+        # 按Y坐标排序（垂直方向）
+        sorted_by_y = sorted(zb, key=lambda p: p[1])
+
+        # 分为上下两行
+        top_row = sorted_by_y[:2]
+        bottom_row = sorted_by_y[2:]
+
+        # 每行内按X坐标排序（水平方向）
+        top_row_sorted = sorted(top_row, key=lambda p: p[0])
+        bottom_row_sorted = sorted(bottom_row, key=lambda p: p[0])
+
+        # 组合成最终顺序：左上、右上、左下、右下
+        zb_sorted = [
+            top_row_sorted[0],  # 左上
+            top_row_sorted[1],  # 右上
+            bottom_row_sorted[0],  # 左下
+            bottom_row_sorted[1]  # 右下
+        ]
+
+        # 更新zb
+        zb = zb_sorted
+    objectPoints = np.array([[0, 0, 76],
+                             [0, 125, 76],
                              [0, 0, 0],
-                             [125, 0, 0]], dtype=np.float32)
+                             [0, 125, 0]], dtype=np.float32)
     imagePoints = np.array(zb, dtype=np.float32).reshape(-1, 1, 2)
     cameraMatrix = np.array([[969.3421, 641.2600, 0],  # 641.2600
                              [0, 970.6431, 361.0710],  # 361.0710
