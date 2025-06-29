@@ -5,9 +5,9 @@ rows = 4
 cols = 2
 zb = [[0 for _ in range(cols)] for _ in range(rows)]
 output_video = "output_video.mp4"
-cv2.namedWindow('mp4_out',cv2.WINDOW_NORMAL)
-cv2.resizeWindow('mp4_out',1200,800)
-video = cv2.VideoCapture("lanliu11.mp4")
+cv2.namedWindow('mp4_out', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('mp4_out', 1200, 800)
+video = cv2.VideoCapture("yellow2.mp4")
 if not video.isOpened():
     print("无法打开视频文件")
     exit()
@@ -15,141 +15,127 @@ if not video.isOpened():
 fps = video.get(cv2.CAP_PROP_FPS)
 width = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
 height = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
 # 创建视频写入对象
 fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # MP4编码
 out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 frame_count = 0
+# 黄色HSV范围（根据实际情况调整）
+yellow_lower = np.array([23, 100, 100])
+yellow_upper = np.array([30, 255, 255])
+def order_points(pts):
+    # 按y坐标升序排序（y值小的在上方）
+    y_sorted = pts[np.argsort(pts[:, 1])]
+    # 取y坐标最小的两个点（上边点）
+    top_points = y_sorted[:2]
+    top_points = top_points[np.argsort(top_points[:, 0])]
+    tl = top_points[0]  # 左上角（y最小且x最小）
+    tr = top_points[1]  # 右上角（y最小但x较大）
+    # 取y坐标最大的两个点（下边点）
+    bottom_points = y_sorted[2:]
+    # 在y坐标最大的两个点中，按x坐标升序排序（x值小的在左侧）
+    bottom_points = bottom_points[np.argsort(bottom_points[:, 0])]
+    bl = bottom_points[0]  # 左下角（y最大但x最小）
+    br = bottom_points[1]  # 右下角（y最大且x最大）
+    return np.array([tl, tr, br, bl], dtype=np.float32)
 while True:
     ret, frame = video.read()
     if not ret:
         print("视频播放完毕")
         break
+
     frame_count += 1
     frame_1 = frame.copy()
-    # 转化为灰度图及全局阈值二值化
-    #retval, binary = cv2.threshold(gray, 75, 255, cv2.THRESH_BINARY)
-    # 显示图像
-    # cv2.imshow('original', image)
-    # cv2.imshow('binary', binary)
-    blue_lower = np.array([80, 50, 50])  # 深蓝色
-    blue_upper = np.array([130, 255, 255])  # 浅蓝色
 
     # 转换为HSV颜色空间
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
-    # 创建蓝色掩膜
-    mask = cv2.inRange(hsv, blue_lower, blue_upper)
-    # 根据二值化图像框选图像轮廓
-    blue_contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    i = 0
+    # 创建黄色掩膜
+    mask = cv2.inRange(hsv, yellow_lower, yellow_upper)
+
+
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 重置检测点
     detected_count = 0
-    for contour in blue_contours:
-        if detected_count >= rows:  # 如果已经存储了4个点，则停止检测
-            break
-        # 计算一个简单的边界框
-        x, y, w, h = cv2.boundingRect(contour)
-        # 计算每个封闭的contour的周长，乘0.03赋值给epsilon作为拟合的精度参数
-        epsilon = 0.03 * cv2.arcLength(contour, True)
-        # 对contour做多边形逼近，epsilon定义了原始轮廓和逼近多边形之间的最大距离，
-        # epsilon越小逼近的多边形就越接近原始的轮廓
-        approx = cv2.approxPolyDP(contour, epsilon, True)
-        # 求多边形边数
-        lens = len(approx)
-        # 求多边形面积
+    # 处理每个轮廓
+    for contour in contours:
+        # 计算轮廓面积
         area = cv2.contourArea(contour)
-        area2=w*h
-        if lens == 6 and 10000 < area < 60000 and area2 < 100000:
-            M = cv2.moments(contour)
-            """if M["m00"] != 0:
-                cx = int(M["m10"] / M["m00"])
-                cy = int(M["m01"] / M["m00"])
-                画出边界框"""
-            img_1 = cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 1)
-            zb[detected_count] = [x, y]
-            detected_count += 1
-        """符合条件的x，y存入数组"""
-    #cv2.imshow("mp4_out", frame)
-    #cv2.imshow("mp4_out", binary)
-    #cv2.waitKey(0)
-    #print(zb)
-    # cv2.imwrite("binary.png", img_1)
-    """h = 0
-    n = 0
-    for h in range(3):
-        for n in range(2):
-            if np.sum(zb[n]) > np.sum(zb[n + 1]):
-                zb[n], zb[n + 1] = zb[n + 1], zb[n]"""
-    '''(a,b)=zb[0]
-    (c,d)=zb[1]
-    (e,f)=zb[2]'''
-    if detected_count > 0:
-        # 只对实际检测到的点排序
-        sorted_points = sorted(zb[:detected_count], key=lambda p: (p[1], p[0]))
 
-        # 更新zb列表
-        for i in range(detected_count):
-            zb[i] = sorted_points[i]
-    # 添加点位置一致性检查
-    if detected_count != 4:
-            continue
-    else:
-        # 按Y坐标排序（垂直方向）
-        sorted_by_y = sorted(zb, key=lambda p: p[1])
+        # 筛选条件 - 只处理大面积的黄色区域
+        if 300000 < area < 600000:
+            # 多边形逼近
+            peri = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.03 * peri, True)
+            # 计算凸包
+            hull = cv2.convexHull(approx)
+            # 确保是四边形
+            if len(approx) == 4:
+                # 确保凸包是凸四边形
+                if len(hull) == 4:
+                    # 存储顶点
+                    quad_pts = approx.reshape(-1, 2)
 
-        # 分为上下两行
-        top_row = sorted_by_y[:2]
-        bottom_row = sorted_by_y[2:]
+                    # 对顶点进行排序
+                    ordered_pts = order_points(quad_pts)
 
-        # 每行内按X坐标排序（水平方向）
-        top_row_sorted = sorted(top_row, key=lambda p: p[0])
-        bottom_row_sorted = sorted(bottom_row, key=lambda p: p[0])
+                    # 存储到zb
+                    for i in range(4):
+                        zb[i][0] = ordered_pts[i][0]
+                        zb[i][1] = ordered_pts[i][1]
 
-        # 组合成最终顺序：左上、右上、左下、右下
-        zb_sorted = [
-            top_row_sorted[0],  # 左上
-            top_row_sorted[1],  # 右上
-            bottom_row_sorted[0],  # 左下
-            bottom_row_sorted[1]  # 右下
-        ]
+                    detected_count = 1  # 只需要检测一个四边形
 
-        # 更新zb
-        zb = zb_sorted
-    objectPoints = np.array([[0, 0, 76],
-                             [0, 125, 76],
-                             [0, 0, 0],
-                             [0, 125, 0]], dtype=np.float32)
-    imagePoints = np.array(zb, dtype=np.float32).reshape(-1, 1, 2)
-    cameraMatrix = np.array([[969.3421, 641.2600, 0],  # 641.2600
-                             [0, 970.6431, 361.0710],  # 361.0710
-                             [0, 0, 1]], dtype=np.float32)
-    distCoeffs = np.array([0.0779, -0.0843, 0, 0], dtype=np.float32).reshape(1, 4)
-    # 使用solvePnP求解相机姿态
-    _, rvec, tvec = cv2.solvePnP(
-        objectPoints,
-        imagePoints,
-        cameraMatrix,
-        distCoeffs
-    )
-    # 使用solvePnP求解相机姿态
-    _, rvec, tvec = cv2.solvePnP(objectPoints, imagePoints, cameraMatrix, distCoeffs)
-    axis_points = np.array([
-        [0, 0, 0],  # 原点
-        [100, 0, 0],  # X轴
-        [0, 100, 0],  # Y轴
-        [0, 0, 100]  # Z轴
-    ], dtype=np.float32)
-    projected_axis_points, _ = cv2.projectPoints(axis_points, rvec, tvec, cameraMatrix, distCoeffs)
-    projected_axis_points = np.int32(projected_axis_points)
-    i=0
-    for i in range(len(projected_axis_points)):
-        cv2.line(frame, tuple(projected_axis_points[0].ravel()), tuple(projected_axis_points[i].ravel()),
-                 (0, 255, 0), 2)
+                    # 绘制四边形轮廓
+                    cv2.drawContours(frame, [hull], -1, (0, 255, 255), 3)
+    # 只有检测到四边形时才计算位姿
+    if detected_count == 1:
+        # 定义实际坐标（单位：毫米）
+        objectPoints = np.array([
+            [0, 0, 0],  # 左上角 (TL)
+            [174, 0, 0],  # 右上角 (TR)
+            [174, 113, 0],  # 右下角 (BR)
+            [0, 113, 0]  # 左下角 (BL)
+        ], dtype=np.float32)
+        # 图像点坐标
+        imagePoints = np.array(zb, dtype=np.float32).reshape(-1, 1, 2)
+        cameraMatrix = np.array([
+            [964.4264, 0, 644.4063],
+            [0, 965.7578, 362.3195],
+            [0, 0, 1]], dtype=np.float32)
+        distCoeffs = np.array([0.073972, -0.005636, 0.000213, 0.001868, -0.313172], dtype=np.float32)
+        # 使用solvePnP求解相机姿态
+        _, rvec, tvec = cv2.solvePnP(
+            objectPoints,
+            imagePoints,
+            cameraMatrix,
+            distCoeffs
+        )
+        axis_points = np.array([
+                [0, 0, 0],  # 原点
+                [100, 0, 0],  # X轴
+                [0, 100, 0],  # Y轴
+                [0, 0, -90]  # Z轴
+            ], dtype=np.float32)
+        projected_axis_points, _ = cv2.projectPoints(axis_points, rvec, tvec, cameraMatrix, distCoeffs)
+        projected_axis_points = projected_axis_points.reshape(-1, 2).astype(int)
+        origin = tuple(projected_axis_points[0])
+        for i in range(1, len(projected_axis_points)):
+            end_point = tuple(projected_axis_points[i])
+            cv2.line(frame, origin, end_point, (0, 0, 255), 4)
     cv2.imshow("mp4_out", frame)
+    # 查看掩膜效果以看筛选效果
+    #cv2.imshow("Yellow Mask", mask)
     out.write(frame)
+
     # 按ESC退出
-    if cv2.waitKey(60) == 27:
+    key = cv2.waitKey(60)
+    if key == 27:  # ESC键
         break
+    elif key == ord(' '):  # 空格键暂停
+        cv2.waitKey(0)
+    elif key == ord('s'):  # 保存当前帧
+        cv2.imwrite(f"frame_{frame_count}.png", frame)
 
 # 释放资源
 video.release()
